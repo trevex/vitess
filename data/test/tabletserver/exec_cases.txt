@@ -621,6 +621,42 @@ options:PassthroughDMLs
   "PKValues": [[1], [2]]
 }
 
+# upsert with values() func and qualified column
+"insert into a (eid, id, name) values (1, 2, 'foo') on duplicate key update name = values(a.name)"
+{
+  "PlanID": "UPSERT_PK",
+  "TableName": "a",
+  "Permissions": [
+    {
+      "TableName": "a",
+      "Role": 1
+    }
+  ],
+  "FullQuery": "insert into a(eid, id, name) values (1, 2, 'foo') on duplicate key update name = values(a.name)",
+  "OuterQuery": "insert into a(eid, id, name) values (1, 2, 'foo')",
+  "UpsertQuery": "update a set name = ('foo') where :#pk",
+  "PKValues": [[1], [2]]
+}
+
+# upsert with values() func and qualified column with improper table
+"insert into a (eid, id, name) values (1, 2, 'foo') on duplicate key update name = values(c.name)"
+"could not find qualified column c.name in table a"
+
+# upsert with values() func and qualified column and qualified table
+"insert into b.a (eid, id, name) values (1, 2, 'foo') on duplicate key update name = values(b.a.name)"
+{
+  "PlanID": "PASS_DML",
+  "Reason": "TABLE",
+  "TableName": "",
+  "Permissions": [
+    {
+      "TableName": "a",
+      "Role": 1
+    }
+  ],
+  "FullQuery": "insert into b.a(eid, id, name) values (1, 2, 'foo') on duplicate key update name = values(b.a.name)"
+}
+
 # upsert with values() inside another func
 "insert into a (eid, id, name) values (1, 2, 'foo') on duplicate key update name = concat(values(name), 'foo')"
 {
@@ -722,7 +758,7 @@ options:PassthroughDMLs
 
 # upsert with mismatch values()
 "insert into a (eid, id) values (1, 2) on duplicate key update eid  = values(eid), name = values(name)"
-"could not find column name"
+"could not find column &{<nil> name { }}"
 
 # upsert pk change, with values() func
 "insert into a (eid, id) values (1, 2) on duplicate key update eid = values(eid), id = values(id)"
@@ -1111,7 +1147,7 @@ options:PassthroughDMLs
   "FullQuery": "update d set foo = 'foo' where name in ('a', 'b') limit 1",
   "OuterQuery": "update d set foo = 'foo' where :#pk",
   "Subquery": "select name from d where name in ('a', 'b') limit 1 for update",
-  "WhereClause": " where name in ('a', 'b')"
+  "WhereClause": "where name in ('a', 'b')"
 }
 
 # update limit with pk
@@ -1266,7 +1302,7 @@ options:PassthroughDMLs
   "FullQuery": "update a set name = 'foo' where eid + 1 = 1",
   "OuterQuery": "update a set name = 'foo' where :#pk",
   "Subquery": "select eid, id from a where eid + 1 = 1 limit :#maxLimit for update",
-  "WhereClause": " where eid + 1 = 1"
+  "WhereClause": "where eid + 1 = 1"
 }
 
 # pk
@@ -1283,7 +1319,7 @@ options:PassthroughDMLs
   "FullQuery": "update a set name = 'foo' where eid = 1 and id = 1",
   "OuterQuery": "update a set name = 'foo' where :#pk",
   "PKValues": [1, 1],
-  "WhereClause": " where eid = 1 and id = 1"
+  "WhereClause": "where eid = 1 and id = 1"
 }
 
 # partial pk
@@ -1300,7 +1336,7 @@ options:PassthroughDMLs
   "FullQuery": "update a set name = 'foo' where eid = 1",
   "OuterQuery": "update a set name = 'foo' where :#pk",
   "Subquery": "select eid, id from a where eid = 1 limit :#maxLimit for update",
-  "WhereClause": " where eid = 1"
+  "WhereClause": "where eid = 1"
 }
 
 # bad pk
@@ -1317,7 +1353,7 @@ options:PassthroughDMLs
   "FullQuery": "update a set name = 'foo' where eid = 1.0 and id = 1",
   "OuterQuery": "update a set name = 'foo' where :#pk",
   "Subquery": "select eid, id from a where eid = 1.0 and id = 1 limit :#maxLimit for update",
-  "WhereClause": " where eid = 1.0 and id = 1"
+  "WhereClause": "where eid = 1.0 and id = 1"
 }
 
 # partial pk with limit
@@ -1334,7 +1370,7 @@ options:PassthroughDMLs
   "FullQuery": "update a set name = 'foo' where eid = 1 limit 10",
   "OuterQuery": "update a set name = 'foo' where :#pk",
   "Subquery": "select eid, id from a where eid = 1 limit 10 for update",
-  "WhereClause": " where eid = 1"
+  "WhereClause": "where eid = 1"
 }
 
 # non-pk
@@ -1351,7 +1387,7 @@ options:PassthroughDMLs
   "FullQuery": "update a set name = 'foo' where eid = 1 and name = 'foo'",
   "OuterQuery": "update a set name = 'foo' where :#pk",
   "Subquery": "select eid, id from a where eid = 1 and name = 'foo' limit :#maxLimit for update",
-  "WhereClause": " where eid = 1 and name = 'foo'"
+  "WhereClause": "where eid = 1 and name = 'foo'"
 }
 
 # no index
@@ -1384,7 +1420,7 @@ options:PassthroughDMLs
   "FullQuery":"update a set name = 'foo' where eid + 1 = 1 and id = 1",
   "OuterQuery":"update a set name = 'foo' where :#pk",
   "Subquery":"select eid, id from a where eid + 1 = 1 and id = 1 limit :#maxLimit for update",
-  "WhereClause": " where eid + 1 = 1 and id = 1"
+  "WhereClause": "where eid + 1 = 1 and id = 1"
 }
 
 # parenthesized expressions in where
@@ -1401,7 +1437,7 @@ options:PassthroughDMLs
   "FullQuery": "update a set name = 'foo' where (eid = 1) and id = 1",
   "OuterQuery": "update a set name = 'foo' where :#pk",
   "PKValues": [1, 1],
-  "WhereClause": " where (eid = 1) and id = 1"
+  "WhereClause": "where (eid = 1) and id = 1"
 }
 
 # in clause expression in where
@@ -1418,7 +1454,7 @@ options:PassthroughDMLs
   "FullQuery":"update a set name = 'foo' where eid in (1, 2) and id = 1",
   "OuterQuery":"update a set name = 'foo' where :#pk",
   "PKValues":[[1,2],1],
-  "WhereClause": " where eid in (1, 2) and id = 1"
+  "WhereClause": "where eid in (1, 2) and id = 1"
 }
 
 # double in clause
@@ -1435,7 +1471,7 @@ options:PassthroughDMLs
   "FullQuery":"update a set name = 'foo' where eid in (1, 2) and id in (1, 2)",
   "OuterQuery":"update a set name = 'foo' where :#pk",
   "Subquery":"select eid, id from a where eid in (1, 2) and id in (1, 2) limit :#maxLimit for update",
-  "WhereClause": " where eid in (1, 2) and id in (1, 2)"
+  "WhereClause": "where eid in (1, 2) and id in (1, 2)"
 }
 
 # double use of pk
@@ -1452,7 +1488,7 @@ options:PassthroughDMLs
   "FullQuery":"update a set name = 'foo' where eid = 1 and eid = 2",
   "OuterQuery":"update a set name = 'foo' where :#pk",
   "Subquery":"select eid, id from a where eid = 1 and eid = 2 limit :#maxLimit for update",
-  "WhereClause": " where eid = 1 and eid = 2"
+  "WhereClause": "where eid = 1 and eid = 2"
 }
 
 # partial pk with order by
@@ -1469,7 +1505,7 @@ options:PassthroughDMLs
   "FullQuery": "update a set name = 'foo' where eid = 1 order by id desc",
   "OuterQuery": "update a set name = 'foo' where :#pk order by id desc",
   "Subquery": "select eid, id from a where eid = 1 order by id desc limit :#maxLimit for update",
-  "WhereClause": " where eid = 1"
+  "WhereClause": "where eid = 1"
 }
 
 # update with index hint
@@ -1487,7 +1523,7 @@ options:PassthroughDMLs
   "FullQuery": "update a use index (b) set name = 'foo' where eid = 1",
   "OuterQuery": "update a set name = 'foo' where :#pk",
   "Subquery": "select eid, id from a use index (b) where eid = 1 limit :#maxLimit for update",
-  "WhereClause": " where eid = 1"
+  "WhereClause": "where eid = 1"
 }
 
 # delete limit with pk
@@ -1504,7 +1540,7 @@ options:PassthroughDMLs
   "FullQuery": "delete from d where name in ('a', 'b') limit 1",
   "OuterQuery": "delete from d where :#pk",
   "Subquery": "select name from d where name in ('a', 'b') limit 1 for update",
-  "WhereClause": " where name in ('a', 'b')"
+  "WhereClause": "where name in ('a', 'b')"
 }
 
 # delete limit with pk
@@ -1568,7 +1604,7 @@ options:PassthroughDMLs
   "FullQuery": "delete from a where eid + 1 = 1",
   "OuterQuery": "delete from a where :#pk",
   "Subquery": "select eid, id from a where eid + 1 = 1 limit :#maxLimit for update",
-  "WhereClause": " where eid + 1 = 1"
+  "WhereClause": "where eid + 1 = 1"
 }
 
 # pk
@@ -1585,7 +1621,7 @@ options:PassthroughDMLs
   "FullQuery": "delete from a where eid = 1 and id = 1",
   "OuterQuery": "delete from a where :#pk",
   "PKValues": [1, 1],
-  "WhereClause": " where eid = 1 and id = 1"
+  "WhereClause": "where eid = 1 and id = 1"
 }
 
 # pk
@@ -1617,7 +1653,7 @@ options:PassthroughDMLs
   "FullQuery": "delete from a where eid = 1",
   "OuterQuery": "delete from a where :#pk",
   "Subquery": "select eid, id from a where eid = 1 limit :#maxLimit for update",
-  "WhereClause": " where eid = 1"
+  "WhereClause": "where eid = 1"
 }
 
 # partial pk with order by
@@ -1634,7 +1670,7 @@ options:PassthroughDMLs
   "FullQuery": "delete from a where eid = 1 order by id desc",
   "OuterQuery": "delete from a where :#pk order by id desc",
   "Subquery": "select eid, id from a where eid = 1 order by id desc limit :#maxLimit for update",
-  "WhereClause": " where eid = 1"
+  "WhereClause": "where eid = 1"
 }
 
 # bad pk value delete
@@ -1651,7 +1687,7 @@ options:PassthroughDMLs
   "FullQuery": "delete from a where eid = 1.0 and id = 1",
   "OuterQuery": "delete from a where :#pk",
   "Subquery": "select eid, id from a where eid = 1.0 and id = 1 limit :#maxLimit for update",
-  "WhereClause": " where eid = 1.0 and id = 1"
+  "WhereClause": "where eid = 1.0 and id = 1"
 }
 
 # non-pk
@@ -1668,7 +1704,7 @@ options:PassthroughDMLs
   "FullQuery": "delete from a where eid = 1 and name = 'foo'",
   "OuterQuery": "delete from a where :#pk",
   "Subquery": "select eid, id from a where eid = 1 and name = 'foo' limit :#maxLimit for update",
-  "WhereClause": " where eid = 1 and name = 'foo'"
+  "WhereClause": "where eid = 1 and name = 'foo'"
 }
 
 # no index
@@ -1701,7 +1737,7 @@ options:PassthroughDMLs
   "FullQuery":"delete from a where eid + 1 = 1 and id = 1",
   "OuterQuery":"delete from a where :#pk",
   "Subquery":"select eid, id from a where eid + 1 = 1 and id = 1 limit :#maxLimit for update",
-  "WhereClause": " where eid + 1 = 1 and id = 1"
+  "WhereClause": "where eid + 1 = 1 and id = 1"
 }
 
 # parenthesized expressions in where
@@ -1718,7 +1754,7 @@ options:PassthroughDMLs
   "FullQuery": "delete from a where (eid = 1) and id = 1",
   "OuterQuery": "delete from a where :#pk",
   "PKValues": [1, 1],
-  "WhereClause": " where (eid = 1) and id = 1"
+  "WhereClause": "where (eid = 1) and id = 1"
 }
 
 # delete in clause expression in where
@@ -1735,7 +1771,7 @@ options:PassthroughDMLs
   "FullQuery":"delete from a where eid in (1, 2) and id = 1",
   "OuterQuery":"delete from a where :#pk",
   "PKValues":[[1,2],1],
-  "WhereClause": " where eid in (1, 2) and id = 1"
+  "WhereClause": "where eid in (1, 2) and id = 1"
 }
 
 # delete double in clause
@@ -1752,7 +1788,7 @@ options:PassthroughDMLs
   "FullQuery":"delete from a where eid in (1, 2) and id in (1, 2)",
   "OuterQuery":"delete from a where :#pk",
   "Subquery":"select eid, id from a where eid in (1, 2) and id in (1, 2) limit :#maxLimit for update",
-  "WhereClause": " where eid in (1, 2) and id in (1, 2)"
+  "WhereClause": "where eid in (1, 2) and id in (1, 2)"
 }
 
 # delete double use of pk
@@ -1769,7 +1805,7 @@ options:PassthroughDMLs
   "FullQuery":"delete from a where eid = 1 and eid = 2",
   "OuterQuery":"delete from a where :#pk",
   "Subquery":"select eid, id from a where eid = 1 and eid = 2 limit :#maxLimit for update",
-  "WhereClause": " where eid = 1 and eid = 2"
+  "WhereClause": "where eid = 1 and eid = 2"
 }
 
 # multi-table delete

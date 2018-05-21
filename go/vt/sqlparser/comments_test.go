@@ -21,86 +21,117 @@ import (
 	"testing"
 )
 
-func TestSplitTrailingComments(t *testing.T) {
+func TestSplitComments(t *testing.T) {
 	var testCases = []struct {
-		input, outSQL, outComments string
+		input, outSQL, outLeadingComments, outTrailingComments string
 	}{{
-		input:       "/",
-		outSQL:      "/",
-		outComments: "",
+		input:               "/",
+		outSQL:              "/",
+		outLeadingComments:  "",
+		outTrailingComments: "",
 	}, {
-		input:       "*/",
-		outSQL:      "*/",
-		outComments: "",
+		input:               "*/",
+		outSQL:              "*/",
+		outLeadingComments:  "",
+		outTrailingComments: "",
 	}, {
-		input:       "/*/",
-		outSQL:      "/*/",
-		outComments: "",
+		input:               "/*/",
+		outSQL:              "/*/",
+		outLeadingComments:  "",
+		outTrailingComments: "",
 	}, {
-		input:       "a*/",
-		outSQL:      "a*/",
-		outComments: "",
+		input:               "a*/",
+		outSQL:              "a*/",
+		outLeadingComments:  "",
+		outTrailingComments: "",
 	}, {
-		input:       "*a*/",
-		outSQL:      "*a*/",
-		outComments: "",
+		input:               "*a*/",
+		outSQL:              "*a*/",
+		outLeadingComments:  "",
+		outTrailingComments: "",
 	}, {
-		input:       "**a*/",
-		outSQL:      "**a*/",
-		outComments: "",
+		input:               "**a*/",
+		outSQL:              "**a*/",
+		outLeadingComments:  "",
+		outTrailingComments: "",
 	}, {
-		input:       "/*b**a*/",
-		outSQL:      "",
-		outComments: "/*b**a*/",
+		input:               "/*b**a*/",
+		outSQL:              "",
+		outLeadingComments:  "",
+		outTrailingComments: "/*b**a*/",
 	}, {
-		input:       "/*a*/",
-		outSQL:      "",
-		outComments: "/*a*/",
+		input:               "/*a*/",
+		outSQL:              "",
+		outLeadingComments:  "",
+		outTrailingComments: "/*a*/",
 	}, {
-		input:       "/**/",
-		outSQL:      "",
-		outComments: "/**/",
+		input:               "/**/",
+		outSQL:              "",
+		outLeadingComments:  "",
+		outTrailingComments: "/**/",
 	}, {
-		input:       "/*b*/ /*a*/",
-		outSQL:      "",
-		outComments: "/*b*/ /*a*/",
+		input:               "/*b*/ /*a*/",
+		outSQL:              "",
+		outLeadingComments:  "",
+		outTrailingComments: "/*b*/ /*a*/",
 	}, {
-		input:       "foo /* bar */",
-		outSQL:      "foo",
-		outComments: " /* bar */",
+		input:               "/* before */ foo /* bar */",
+		outSQL:              "foo",
+		outLeadingComments:  "/* before */ ",
+		outTrailingComments: " /* bar */",
 	}, {
-		input:       "foo /** bar */",
-		outSQL:      "foo",
-		outComments: " /** bar */",
+		input:               "/* before1 */ /* before2 */ foo /* after1 */ /* after2 */",
+		outSQL:              "foo",
+		outLeadingComments:  "/* before1 */ /* before2 */ ",
+		outTrailingComments: " /* after1 */ /* after2 */",
 	}, {
-		input:       "foo /*** bar */",
-		outSQL:      "foo",
-		outComments: " /*** bar */",
+		input:               "/** before */ foo /** bar */",
+		outSQL:              "foo",
+		outLeadingComments:  "/** before */ ",
+		outTrailingComments: " /** bar */",
 	}, {
-		input:       "foo /** bar **/",
-		outSQL:      "foo",
-		outComments: " /** bar **/",
+		input:               "/*** before */ foo /*** bar */",
+		outSQL:              "foo",
+		outLeadingComments:  "/*** before */ ",
+		outTrailingComments: " /*** bar */",
 	}, {
-		input:       "foo /*** bar ***/",
-		outSQL:      "foo",
-		outComments: " /*** bar ***/",
+		input:               "/** before **/ foo /** bar **/",
+		outSQL:              "foo",
+		outLeadingComments:  "/** before **/ ",
+		outTrailingComments: " /** bar **/",
 	}, {
-		input:       "foo /*** bar ***/ ",
-		outSQL:      "foo",
-		outComments: " /*** bar ***/",
+		input:               "/*** before ***/ foo /*** bar ***/",
+		outSQL:              "foo",
+		outLeadingComments:  "/*** before ***/ ",
+		outTrailingComments: " /*** bar ***/",
 	}, {
-		input:       "*** bar ***/",
-		outSQL:      "*** bar ***/",
-		outComments: "",
+		input:               " /*** before ***/ foo /*** bar ***/ ",
+		outSQL:              "foo",
+		outLeadingComments:  "/*** before ***/ ",
+		outTrailingComments: " /*** bar ***/",
+	}, {
+		input:               "*** bar ***/",
+		outSQL:              "*** bar ***/",
+		outLeadingComments:  "",
+		outTrailingComments: "",
+	}, {
+		input:               " foo ",
+		outSQL:              "foo",
+		outLeadingComments:  "",
+		outTrailingComments: "",
 	}}
 	for _, testCase := range testCases {
-		gotSQL, gotComments := SplitTrailingComments(testCase.input)
+		gotSQL, gotComments := SplitMarginComments(testCase.input)
+		gotLeadingComments, gotTrailingComments := gotComments.Leading, gotComments.Trailing
 
 		if gotSQL != testCase.outSQL {
 			t.Errorf("test input: '%s', got SQL\n%+v, want\n%+v", testCase.input, gotSQL, testCase.outSQL)
 		}
-		if gotComments != testCase.outComments {
-			t.Errorf("test input: '%s', got Comments\n%+v, want\n%+v", testCase.input, gotComments, testCase.outComments)
+		if gotLeadingComments != testCase.outLeadingComments {
+			t.Errorf("test input: '%s', got LeadingComments\n%+v, want\n%+v", testCase.input, gotLeadingComments, testCase.outLeadingComments)
+		}
+		if gotTrailingComments != testCase.outTrailingComments {
+			t.Errorf("test input: '%s', got TrailingComments\n%+v, want\n%+v", testCase.input, gotTrailingComments, testCase.outTrailingComments)
 		}
 	}
 }
