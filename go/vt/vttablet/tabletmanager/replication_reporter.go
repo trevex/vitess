@@ -122,6 +122,11 @@ func repairReplication(ctx context.Context, agent *ActionAgent) error {
 	if !si.HasMaster() {
 		return fmt.Errorf("no master tablet for shard %v/%v", tablet.Keyspace, tablet.Shard)
 	}
+
+	if si.GetReparentTimeNs() != 0 {
+		return fmt.Errorf("Skipping repair replication as reparent is in progress since %d", si.GetReparentTimeNs())
+	}
+
 	return agent.setMasterLocked(ctx, si.MasterAlias, 0, true)
 }
 

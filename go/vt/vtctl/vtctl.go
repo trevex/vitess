@@ -229,6 +229,10 @@ var commands = []commandGroup{
 				"<tablet alias>",
 				"Changes metadata in the topology server to acknowledge a shard master change performed by an external tool. See the Reparenting guide for more information:" +
 					"https://github.com/vitessio/vitess/blob/master/doc/Reparenting.md#external-reparents."},
+			{"PreExternallyReparentShard", commandPreExternallyReparentShard,
+				"<keyspace/shard>",
+				"Changes metadata in the shard record before a shard master change is performed by an external tool. See the Reparenting guide for more information:" +
+					"https://github.com/vitessio/vitess/blob/master/doc/Reparenting.md#external-reparents."},
 			{"ValidateShard", commandValidateShard,
 				"[-ping-tablets] <keyspace/shard>",
 				"Validates that all nodes that are reachable from this shard are consistent."},
@@ -1169,7 +1173,29 @@ func commandTabletExternallyReparented(ctx context.Context, wr *wrangler.Wrangle
 	if err != nil {
 		return err
 	}
+
+	if err := wr.UpdateReparentTimeNsShardRecord(ctx, ti.GetKeyspace(), ti.GetShard(), 0); err != nil {
+		return err
+	}
+
 	return wr.TabletManagerClient().TabletExternallyReparented(ctx, ti.Tablet, "")
+}
+
+func commandPreExternallyReparentShard(ctx context.Context, wr *wrangler.Wrangler, subFlags *flag.FlagSet, args []string) error {
+	if err := subFlags.Parse(args); err != nil {
+		return err
+	}
+
+	if subFlags.NArg() != 1 {
+		return fmt.Errorf("the <keyspace/shard> argument is required for the PreExternallyReparentShard command")
+	}
+
+	keyspace, shard, err := topoproto.ParseKeyspaceShard(subFlags.Arg(0))
+	if err != nil {
+		return err
+	}
+
+	return wr.UpdateReparentTimeNsShardRecord(ctx, keyspace, shard, time.Now().UnixNano())
 }
 
 func commandValidateShard(ctx context.Context, wr *wrangler.Wrangler, subFlags *flag.FlagSet, args []string) error {

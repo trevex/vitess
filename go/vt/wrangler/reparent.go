@@ -336,14 +336,33 @@ func (wr *Wrangler) PlannedReparentShard(ctx context.Context, keyspace, shard st
 	// Create reusable Reparent event with available info
 	ev := &events.Reparent{}
 
+	// Set the reparenting in progress timestamp on the shard record
+	if shardErr := wr.UpdateReparentTimeNsShardRecord(ctx, keyspace, shard, time.Now().UnixNano()); shardErr != nil {
+		return shardErr
+	}
+
 	// do the work
 	err = wr.plannedReparentShardLocked(ctx, ev, keyspace, shard, masterElectTabletAlias, avoidMasterAlias, waitSlaveTimeout)
+
+	// Reset reparenting in progress timestamp to 0 on the shard record
+	if shardErr := wr.UpdateReparentTimeNsShardRecord(ctx, keyspace, shard, 0); shardErr != nil {
+		return shardErr
+	}
+
 	if err != nil {
 		event.DispatchUpdate(ev, "failed PlannedReparentShard: "+err.Error())
 	} else {
 		event.DispatchUpdate(ev, "finished PlannedReparentShard")
 	}
 	return err
+}
+
+func (wr *Wrangler) UpdateReparentTimeNsShardRecord(ctx context.Context, keyspace, shard string, reparent_time_ns int64) (err error) {
+	_, err = wr.ts.UpdateShardFields(ctx, keyspace, shard, func(si *topo.ShardInfo) error {
+		return si.UpdateReparentTimeNs(ctx, reparent_time_ns)
+	})
+
+	return
 }
 
 func (wr *Wrangler) plannedReparentShardLocked(ctx context.Context, ev *events.Reparent, keyspace, shard string, masterElectTabletAlias, avoidMasterTabletAlias *topodatapb.TabletAlias, waitSlaveTimeout time.Duration) error {
@@ -584,8 +603,19 @@ func (wr *Wrangler) EmergencyReparentShard(ctx context.Context, keyspace, shard 
 	// Create reusable Reparent event with available info
 	ev := &events.Reparent{}
 
+	// Set the reparenting in progress timestamp on the shard record
+	if shardErr := wr.UpdateReparentTimeNsShardRecord(ctx, keyspace, shard, time.Now().UnixNano()); shardErr != nil {
+		return shardErr
+	}
+
 	// do the work
 	err = wr.emergencyReparentShardLocked(ctx, ev, keyspace, shard, masterElectTabletAlias, waitSlaveTimeout)
+
+	// Reset the reparenting in progress timestamp on the share record to 0
+	if shardErr := wr.UpdateReparentTimeNsShardRecord(ctx, keyspace, shard, 0); shardErr != nil {
+		return shardErr
+	}
+
 	if err != nil {
 		event.DispatchUpdate(ev, "failed EmergencyReparentShard: "+err.Error())
 	} else {

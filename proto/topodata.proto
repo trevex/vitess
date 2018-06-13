@@ -225,6 +225,11 @@ message Shard {
   // tablet_controls has at most one entry per TabletType.
   // The keyspace lock is always taken when changing this.
   repeated TabletControl tablet_controls = 6;
+
+  // reparent_time_ns is set during a reparent operation
+  // and is the time a reparent on this shard started.
+  // If the value is 0 there is no ongoing reparent.
+  int64 reparent_time_ns = 7;
 }
 
 // A Keyspace contains data about a keyspace.

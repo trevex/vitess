@@ -463,6 +463,10 @@ func (si *ShardInfo) UpdateDisableQueryService(ctx context.Context, tabletType t
 	return nil
 }
 
+func (si *ShardInfo) UpdateReparentTimeNs(ctx context.Context, reparent_time_ns int64) error {
+	return nil
+}
+
 func (si *ShardInfo) removeCellsFromTabletControl(tc *topodatapb.Shard_TabletControl, tabletType topodatapb.TabletType, cells []string) {
 	result, emptyList := removeCells(tc.Cells, cells, si.Cells)
 	if emptyList {
