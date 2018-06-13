@@ -34,6 +34,8 @@ func buildSelectPlan(sel *sqlparser.Select, vschema ContextVSchema) (primitive e
 		return nil, err
 	}
 	if rb, ok := pb.bldr.(*route); ok {
+		directives := sqlparser.ExtractCommentDirectives(sel.Comments)
+		rb.ERoute.QueryTimeout = queryTimeout(directives)
 		if rb.ERoute.TargetDestination != nil {
 			return nil, errors.New("unsupported: SELECT with a target destination")
 		}
@@ -117,11 +119,11 @@ func (pb *primitiveBuilder) pushFilter(boolExpr sqlparser.Expr, whereType string
 	filters := splitAndExpression(nil, boolExpr)
 	reorderBySubquery(filters)
 	for _, filter := range filters {
-		origin, err := pb.findOrigin(filter)
+		origin, expr, err := pb.findOrigin(filter)
 		if err != nil {
 			return err
 		}
-		if err := pb.bldr.PushFilter(pb, filter, whereType, origin); err != nil {
+		if err := pb.bldr.PushFilter(pb, expr, whereType, origin); err != nil {
 			return err
 		}
 	}
@@ -166,10 +168,11 @@ func (pb *primitiveBuilder) pushSelectRoutes(selectExprs sqlparser.SelectExprs) 
 	for i, node := range selectExprs {
 		switch node := node.(type) {
 		case *sqlparser.AliasedExpr:
-			origin, err := pb.findOrigin(node.Expr)
+			origin, expr, err := pb.findOrigin(node.Expr)
 			if err != nil {
 				return nil, err
 			}
+			node.Expr = expr
 			resultColumns[i], _, err = pb.bldr.PushSelect(node, origin)
 			if err != nil {
 				return nil, err
@@ -204,4 +207,22 @@ func (pb *primitiveBuilder) pushSelectRoutes(selectExprs sqlparser.SelectExprs) 
 		}
 	}
 	return resultColumns, nil
+}
+
+// queryTimeout returns DirectiveQueryTimeout value if set, otherwise returns 0.
+func queryTimeout(d sqlparser.CommentDirectives) int {
+	if d == nil {
+		return 0
+	}
+
+	val, ok := d[sqlparser.DirectiveQueryTimeout]
+	if !ok {
+		return 0
+	}
+
+	intVal, ok := val.(int)
+	if ok {
+		return intVal
+	}
+	return 0
 }

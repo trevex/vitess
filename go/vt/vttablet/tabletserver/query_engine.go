@@ -162,6 +162,8 @@ type QueryEngine struct {
 
 	strictTransTables bool
 
+	enableConsolidator bool
+
 	// Loggers
 	accessCheckerLogger *logutil.ThrottledLogger
 }
@@ -196,7 +198,7 @@ func NewQueryEngine(checker connpool.MySQLChecker, se *schema.Engine, config tab
 		time.Duration(config.IdleTimeout*1e9),
 		checker,
 	)
-
+	qe.enableConsolidator = config.EnableConsolidator
 	qe.consolidator = sync2.NewConsolidator()
 	qe.txSerializer = txserializer.New(config.EnableHotRowProtectionDryRun,
 		config.HotRowProtectionMaxQueueSize,
@@ -326,7 +328,11 @@ func (qe *QueryEngine) GetPlan(ctx context.Context, logStats *tabletenv.LogStats
 	// acceptable because those numbers are best effort.
 	qe.mu.RLock()
 	defer qe.mu.RUnlock()
-	splan, err := planbuilder.Build(sql, qe.tables)
+	statement, err := sqlparser.Parse(sql)
+	if err != nil {
+		return nil, err
+	}
+	splan, err := planbuilder.Build(statement, qe.tables)
 	if err != nil {
 		return nil, err
 	}
@@ -354,7 +360,7 @@ func (qe *QueryEngine) GetPlan(ctx context.Context, logStats *tabletenv.LogStats
 	} else if plan.PlanID == planbuilder.PlanDDL || plan.PlanID == planbuilder.PlanSet {
 		return plan, nil
 	}
-	if !skipQueryPlanCache {
+	if !skipQueryPlanCache && !sqlparser.SkipQueryPlanCacheDirective(statement) {
 		qe.plans.Set(sql, plan)
 	}
 	return plan, nil

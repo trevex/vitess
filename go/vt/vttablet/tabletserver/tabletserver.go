@@ -245,10 +245,16 @@ func NewTabletServer(config tabletenv.TabletConfig, topoServer *topo.Server, ali
 			tsv.mu.Unlock()
 			return state
 		})
+		stats.Publish("TabletStateName", stats.StringFunc(tsv.GetState))
+
+		// TabletServerState exports the same information as the above two stats (TabletState / TabletStateName),
+		// but exported with TabletStateName as a label for Prometheus, which doesn't support exporting strings as stat values.
+		stats.NewGaugesFuncWithMultiLabels("TabletServerState", "Tablet server state labeled by state name", []string{"name"}, func() map[string]int64 {
+			return map[string]int64{tsv.GetState(): 1}
+		})
 		stats.NewGaugeDurationFunc("QueryTimeout", "Tablet server query timeout", tsv.QueryTimeout.Get)
 		stats.NewGaugeDurationFunc("QueryPoolTimeout", "Tablet server timeout to get a connection from the query pool", tsv.qe.connTimeout.Get)
 		stats.NewGaugeDurationFunc("BeginTimeout", "Tablet server begin timeout", tsv.BeginTimeout.Get)
-		stats.Publish("TabletStateName", stats.StringFunc(tsv.GetState))
 	})
 	return tsv
 }
@@ -2072,6 +2078,13 @@ func (tsv *TabletServer) SetTxPoolWaiterCap(val int64) {
 // This function should only be used for testing.
 func (tsv *TabletServer) GetTxPoolWaiterCap() int64 {
 	return tsv.te.txPool.waiterCap.Get()
+}
+
+// SetConsolidatorEnabled (true) will enable the query consolidator.
+// SetConsolidatorEnabled (false) will disable the query consolidator.
+// This function should only be used for testing.
+func (tsv *TabletServer) SetConsolidatorEnabled(enabled bool) {
+	tsv.qe.enableConsolidator = enabled
 }
 
 // queryAsString returns a readable version of query+bind variables.
