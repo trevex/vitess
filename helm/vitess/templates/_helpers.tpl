@@ -165,6 +165,10 @@ done
 -s3_backup_server_side_encryption=$VT_S3_BACKUP_SERVER_SIDE_ENCRYPTION
     {{ end }}
 
+    {{ else if eq .backup_storage_implementation "ceph" }}
+-ceph_backup_storage_config=$CEPH_CREDENTIALS_FILE
+    {{ end }}
+
   {{ end }}
 
 {{ end }}
@@ -251,6 +255,14 @@ done
 
   {{ end }}
 
+  {{ else if eq .backup_storage_implementation "ceph" }}
+
+- name: backup-creds
+  secret:
+    secretName: {{required ".cephSecret necessary to use backup_storage_implementation: ceph!" .cephSecret }}
+
+  {{ end }}
+
 {{ end }}
 
 {{- end -}}
@@ -275,6 +287,13 @@ done
 - name: backup-creds
   mountPath: /etc/secrets/creds
     {{ end }}
+
+  {{ end }}
+
+  {{ else if eq .backup_storage_implementation "ceph" }}
+
+- name: backup-creds
+  mountPath: /etc/secrets/creds
 
   {{ end }}
 
@@ -305,6 +324,13 @@ credsPath=/etc/secrets/creds/$(ls /etc/secrets/creds/ | head -1)
 
 export AWS_SHARED_CREDENTIALS_FILE=$credsPath
 cat $AWS_SHARED_CREDENTIALS_FILE
+    {{ end }}
+
+  {{ else if eq .backup_storage_implementation "ceph" }}
+
+credsPath=/etc/secrets/creds/$(ls /etc/secrets/creds/ | head -1)
+export CEPH_CREDENTIALS_FILE=$credsPath
+cat $CEPH_CREDENTIALS_FILE
     {{ end }}
 
   {{ end }}
